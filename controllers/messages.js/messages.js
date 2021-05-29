@@ -1,5 +1,5 @@
 const messagesRepository = require('./messages.rep');
-const SUCCESS = "success";
+const responseService = require('../../utils/response');
 
 module.exports = (app)=> {
     // add new message by topic and publish messages to topic listeners
@@ -7,10 +7,10 @@ module.exports = (app)=> {
         try { 
             const { topic, message } = req.body;
             messagesRepository.newMessage(topic, message);
-            res.status(200).send(SUCCESS)
+            res.status(responseService.status.OK).send(responseService.message.SUCCESS)
         } catch (err) {
-            console.log(err)
-            res.status(500).send(JSON.stringify(err));
+            console.log(err) 
+            res.status(responseService.status.INTERNAL_ERROR).send(JSON.stringify(err));
         }
     })
 
@@ -21,7 +21,7 @@ module.exports = (app)=> {
             messagesRepository.clientSubscribe(clientId, topic, res, req);
         } catch (err) { 
             console.log(err)
-            res.status(500).send(JSON.stringify(err));
+            res.status(responseService.status.INTERNAL_ERROR).send(JSON.stringify(err));
         }
     }) 
 
@@ -30,10 +30,10 @@ module.exports = (app)=> {
         try {
             const { clientId, topic } = req.params;
             messagesRepository.clientUnsubscribe(clientId, topic);
-            res.status(200).send(SUCCESS)
+            res.status(responseService.status.OK).send(responseService.message.SUCCESS)
 
         } catch (err) {
-            res.status(500).send(JSON.stringify(err));
+            res.status(responseService.status.INTERNAL_ERROR).send(JSON.stringify(err));
         }
     })
 }
