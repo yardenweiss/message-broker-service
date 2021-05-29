@@ -1,56 +1,90 @@
+//for every topic (key) the value is an messages array
+const messagesMap = new Map();
+//for every topic (key) the value is array of clientId and res object
+const clientsMap = new Map();
 
-
-module.export={
+module.exports = {
     newMessage,
     clientSubscribe,
     clientUnsubscribe
 }
 
+/*if there is a clients that subscribe to this topic add the msg to messages in clientMap
+else save the msg in messagesMap by topic*/
 function newMessage(topic, message) {
-    try{
-        if (!messages.has(topic)) {
-            messages.set(topic, [message])
+    try {
+        if (clientsMap.has(topic)) {
+            clientsMap.get(topic).forEach(client => {
+                client.messages.push(message)
+            })
         } else {
-            const prev_messages = messages.get(topic);
-            prev_messages.push(message);
-            messages.set(topic, prev_messages);
+            if (!messagesMap.has(topic)) {
+                messagesMap.set(topic, [message])
+            } else {
+                const prevMessages = messagesMap.get(topic);
+                prevMessages.push(message);
+                messagesMap.set(topic, prevMessages);
+            }
         }
         publish(topic);
-    }catch(err){
+    } catch (err) {
         throw err;
     }
 }
 
-function clientSubscribe(clientId, topic) {
-    try{
-        if (!clients.has(topic)) {
-            clients.set(topic, [{ clientId: clientId, res: res }])
+/*if the subscribed clientId have messages in the spesific topic we send immediately receive the messages
+else save the rellavant data in clientData*/ 
+function clientSubscribe(clientId, topic, res, req) {
+    try {
+        const messages = messagesMap.has(topic) ? messagesMap.get(topic) : [];
+        if (messages.length > 0) {
+            res.end(JSON.stringify({ messages, topic }));
         } else {
-            const client_data = clients.get(topic);
-            if (!client_data.find(x => x.clientId == clientId)) {
-                client_data.push({ clientId: clientId, res: res });
+            if (!clientsMap.has(topic)) {
+                clientsMap.set(topic, [{ clientId: clientId, res: res, messages: messages }])
+            } else {
+                const clientData = clientsMap.get(topic);
+                if (!clientData.find(x => x.clientId == clientId)) {
+                    clientData.push({ clientId: clientId, res: res, messages: messages });
+                }
+                clientsMap.set(topic, clientData);
             }
-            clients.set(topic, client_data);
         }
-        publish(topic, clientId);
-        req.on('close', () => {
-        });
-    }catch(err){
+    } catch (err) {
         throw err;
     }
 }
 
+/*delete client from clientData array by topic*/ 
 function clientUnsubscribe(clientId, topic) {
-    try{
-        if (clients.has(topic)) {
-            const client_data = clients.get(topic);
-            const index = client_data.findIndex(x => x.clientId == clientId);
+    try {
+        if (clientsMap.has(topic)) {
+            const clientData = clientsMap.get(topic);
+            const index = clientData.findIndex(x => x.clientId == clientId);
             if (index > -1) {
-                client_data.splice(index, 1);
+                clientData.splice(index, 1);
             }
-            clients.set(topic, client_data);
+            clientsMap.set(topic, clientData);
         }
-    }catch(err){
+    } catch (err) {
         throw err;
+    }
+}
+
+/*if topic exist in client map send to all his clients the messages and then unsubscribed*/
+function publish(topic) {
+    if (clientsMap.has(topic)) {
+        const clientData = clientsMap.get(topic);
+        let savedClientsId = [];
+
+        clientData.forEach(element => {
+            const result = { messages: element.messages, topic: topic };
+            element.res.end(JSON.stringify(result));
+            savedClientsId.push(element.clientId);
+        });
+
+        savedClientsId.forEach(clientId => {
+            clientUnsubscribe(clientId, topic);
+        })
     }
 }
